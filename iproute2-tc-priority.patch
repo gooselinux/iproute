@@ -1,0 +1,86 @@
+diff --git a/tc/f_u32.c b/tc/f_u32.c
+index 4f5f74e..d75ca27 100644
+--- a/tc/f_u32.c
++++ b/tc/f_u32.c
+@@ -193,6 +193,28 @@ static int pack_key8(struct tc_u32_sel *sel, __u32 key, __u32 mask, int off, int
+ 	return pack_key(sel, key, mask, off, offmask);
+ }
+ 
++static int pack_key8_b(struct tc_u32_sel *sel, __u32 key, __u32 mask, int off, int offmask)
++{
++	if (key > 0xFF || mask > 0xFF)
++		return -1;
++
++	if ((off & 3) == 0) {
++		key <<= 20;
++		mask <<= 20;
++	} else if ((off & 3) == 1) {
++		key <<= 16;
++		mask <<= 16;
++	} else if ((off & 3) == 2) {
++		key <<= 8;
++		mask <<= 8;
++	}
++	off &= ~3;
++	key = htonl(key);
++	mask = htonl(mask);
++
++	return pack_key(sel, key, mask, off, offmask);
++}
++
+ 
+ int parse_at(int *argc_p, char ***argv_p, int *off, int *offmask)
+ {
+@@ -321,6 +343,42 @@ static int parse_u8(int *argc_p, char ***argv_p, struct tc_u32_sel *sel,
+ 	return res;
+ }
+ 
++static int parse_u8_b(int *argc_p, char ***argv_p, struct tc_u32_sel *sel,
++		    int off, int offmask)
++{
++	int res = -1;
++	int argc = *argc_p;
++	char **argv = *argv_p;
++	__u32 key;
++	__u32 mask;
++
++	if (argc < 2)
++		return -1;
++
++	if (get_u32(&key, *argv, 0))
++		return -1;
++	argc--; argv++;
++
++	if (get_u32(&mask, *argv, 16))
++		return -1;
++	argc--; argv++;
++
++	if (key > 0xFF || mask > 0xFF)
++		return -1;
++
++	if (argc > 0 && strcmp(argv[0], "at") == 0) {
++		NEXT_ARG();
++		if (parse_at(&argc, &argv, &off, &offmask))
++			return -1;
++	}
++
++	/* res = pack_key8(sel, key, mask, off, offmask); */
++	res = pack_key8_b(sel, key, mask, off, offmask);
++	*argc_p = argc;
++	*argv_p = argv;
++	return res;
++}
++
+ static int parse_ip_addr(int *argc_p, char ***argv_p, struct tc_u32_sel *sel,
+ 			 int off)
+ {
+@@ -522,7 +580,8 @@ static int parse_ip6(int *argc_p, char ***argv_p, struct tc_u32_sel *sel)
+ 		res = parse_ip6_addr(&argc, &argv, sel, 24);
+ 	} else if (strcmp(*argv, "priority") == 0) {
+ 		NEXT_ARG();
+-		res = parse_u8(&argc, &argv, sel, 4, 0);
++		/* res = parse_u8(&argc, &argv, sel, 4, 0); */
++		res = parse_u8_b(&argc, &argv, sel, 0, 0);
+ 	} else if (strcmp(*argv, "protocol") == 0) {
+ 		NEXT_ARG();
+ 		res = parse_u8(&argc, &argv, sel, 6, 0);

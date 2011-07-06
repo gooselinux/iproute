@@ -1,0 +1,60 @@
+From 38497f41cbebfa84e16f77e504297798f228f2a3 Mon Sep 17 00:00:00 2001
+From: Petr Lautrbach <plautrba@redhat.com>
+Date: Tue, 15 Jun 2010 16:23:21 +0200
+Subject: [PATCH] iproute: ss - fix missing parameters
+
+Signed-off-by: Petr Lautrbach <plautrba@redhat.com>
+---
+ man/man8/ss.8 |    4 ++--
+ misc/ss.c     |    6 ++++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/man/man8/ss.8 b/man/man8/ss.8
+index 015feb3..4c1c624 100644
+--- a/man/man8/ss.8
++++ b/man/man8/ss.8
+@@ -82,12 +82,12 @@ Display only Unix domain sockets.
+ Display sockets of type FAMILY.
+ Currently the following families are supported: unix, inet, inet6, link, netlink.
+ .TP
+-.B \-A QUERY, \-\-query=QUERY
++.B \-A QUERY, \-\-query=QUERY, \-\-socket=QUERY
+ List of socket tables to dump, separated by commas. The following identifiers
+ are understood: all, inet, tcp, udp, raw, unix, packet, netlink, unix_dgram,
+ unix_stream, packet_raw, packet_dgram.
+ .TP
+-.B \-D FILE
++.B \-D FILE, \-\-diag=FILE
+ Do not display anything, just dump raw information about TCP sockets to FILE after applying filters. If FILE is - stdout is used.
+ .TP
+ .B \-F FILE, \-\-filter=FILE
+diff --git a/misc/ss.c b/misc/ss.c
+index 8a9663c..790f820 100644
+--- a/misc/ss.c
++++ b/misc/ss.c
+@@ -2359,9 +2359,10 @@ static void _usage(FILE *dest)
+ "   -x, --unix		display only Unix domain sockets\n"
+ "   -f, --family=FAMILY display sockets of type FAMILY\n"
+ "\n"
+-"   -A, --query=QUERY\n"
++"   -A, --query=QUERY, --socket=QUERY\n"
+ "       QUERY := {all|inet|tcp|udp|raw|unix|packet|netlink}[,QUERY]\n"
+ "\n"
++"   -D, --diag=FILE	Dump raw information about TCP sockets to FILE\n"
+ "   -F, --filter=FILE   read filter information from FILE\n"
+ "       FILTER := [ state TCP-STATE ] [ EXPRESSION ]\n"
+ 		);
+@@ -2429,8 +2430,9 @@ static const struct option long_opts[] = {
+ 	{ "packet", 0, 0, '0' },
+ 	{ "family", 1, 0, 'f' },
+ 	{ "socket", 1, 0, 'A' },
++	{ "query", 1, 0, 'A' },
+ 	{ "summary", 0, 0, 's' },
+-	{ "diag", 0, 0, 'D' },
++	{ "diag", 1, 0, 'D' },
+ 	{ "filter", 1, 0, 'F' },
+ 	{ "version", 0, 0, 'V' },
+ 	{ "help", 0, 0, 'h' },
+-- 
+1.7.1
+

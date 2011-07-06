@@ -1,0 +1,1881 @@
+From ab322673298bd0b8927cdd9d11f3d36af5941b93 Mon Sep 17 00:00:00 2001
+From: Stephen Hemminger <stephen.hemminger@vyatta.com>
+Date: Sat, 26 Dec 2009 11:02:25 -0800
+Subject: [PATCH] Update exported kernel headers
+
+These corespond with 2.6.33-rc2
+---
+ include/linux/fib_rules.h                |   17 +++--
+ include/linux/gen_stats.h                |   15 ++---
+ include/linux/if.h                       |   16 ++---
+ include/linux/if_addr.h                  |    9 +--
+ include/linux/if_addrlabel.h             |    6 +-
+ include/linux/if_arp.h                   |    3 +-
+ include/linux/if_link.h                  |   42 +++++++-----
+ include/linux/if_tunnel.h                |   17 ++++-
+ include/linux/if_vlan.h                  |    1 +
+ include/linux/neighbour.h                |   18 ++---
+ include/linux/netdevice.h                |    3 +-
+ include/linux/netfilter/x_tables.h       |   21 ++----
+ include/linux/netfilter/xt_tcpudp.h      |    6 +-
+ include/linux/netfilter_ipv4/ip_tables.h |   15 ++---
+ include/linux/netlink.h                  |   15 ++---
+ include/linux/pkt_cls.h                  |   84 ++++++++---------------
+ include/linux/pkt_sched.h                |  111 ++++++++++--------------------
+ include/linux/rtnetlink.h                |   57 +++++----------
+ include/linux/tc_act/tc_gact.h           |    9 +--
+ include/linux/tc_act/tc_ipt.h            |    3 +-
+ include/linux/tc_act/tc_mirred.h         |    6 +-
+ include/linux/tc_act/tc_nat.h            |    6 +-
+ include/linux/tc_act/tc_pedit.h          |    9 +--
+ include/linux/tc_act/tc_skbedit.h        |    2 +
+ include/linux/tc_ematch/tc_em_cmp.h      |    6 +-
+ include/linux/tc_ematch/tc_em_meta.h     |   15 ++---
+ include/linux/tc_ematch/tc_em_nbyte.h    |    3 +-
+ include/linux/xfrm.h                     |   35 +++++-----
+ 28 files changed, 212 insertions(+), 338 deletions(-)
+
+diff --git a/include/linux/fib_rules.h b/include/linux/fib_rules.h
+index 87b606b..51da65b 100644
+--- a/include/linux/fib_rules.h
++++ b/include/linux/fib_rules.h
+@@ -8,13 +8,14 @@
+ #define FIB_RULE_PERMANENT	0x00000001
+ #define FIB_RULE_INVERT		0x00000002
+ #define FIB_RULE_UNRESOLVED	0x00000004
+-#define FIB_RULE_DEV_DETACHED	0x00000008
++#define FIB_RULE_IIF_DETACHED	0x00000008
++#define FIB_RULE_DEV_DETACHED	FIB_RULE_IIF_DETACHED
++#define FIB_RULE_OIF_DETACHED	0x00000010
+ 
+ /* try to find source address in routing lookups */
+ #define FIB_RULE_FIND_SADDR	0x00010000
+ 
+-struct fib_rule_hdr
+-{
++struct fib_rule_hdr {
+ 	__u8		family;
+ 	__u8		dst_len;
+ 	__u8		src_len;
+@@ -28,12 +29,12 @@ struct fib_rule_hdr
+ 	__u32		flags;
+ };
+ 
+-enum
+-{
++enum {
+ 	FRA_UNSPEC,
+ 	FRA_DST,	/* destination address */
+ 	FRA_SRC,	/* source address */
+-	FRA_IFNAME,	/* interface name */
++	FRA_IIFNAME,	/* interface name */
++#define FRA_IFNAME	FRA_IIFNAME
+ 	FRA_GOTO,	/* target to jump to (FR_ACT_GOTO) */
+ 	FRA_UNUSED2,
+ 	FRA_PRIORITY,	/* priority/preference */
+@@ -47,13 +48,13 @@ enum
+ 	FRA_UNUSED8,
+ 	FRA_TABLE,	/* Extended table id */
+ 	FRA_FWMASK,	/* mask for netfilter mark */
++	FRA_OIFNAME,
+ 	__FRA_MAX
+ };
+ 
+ #define FRA_MAX (__FRA_MAX - 1)
+ 
+-enum
+-{
++enum {
+ 	FR_ACT_UNSPEC,
+ 	FR_ACT_TO_TBL,		/* Pass to fixed table */
+ 	FR_ACT_GOTO,		/* Jump to another rule */
+diff --git a/include/linux/gen_stats.h b/include/linux/gen_stats.h
+index 710e901..552c8a0 100644
+--- a/include/linux/gen_stats.h
++++ b/include/linux/gen_stats.h
+@@ -18,13 +18,11 @@ enum {
+  * @bytes: number of seen bytes
+  * @packets: number of seen packets
+  */
+-struct gnet_stats_basic
+-{
++struct gnet_stats_basic {
+ 	__u64	bytes;
+ 	__u32	packets;
+ };
+-struct gnet_stats_basic_packed
+-{
++struct gnet_stats_basic_packed {
+ 	__u64	bytes;
+ 	__u32	packets;
+ } __attribute__ ((packed));
+@@ -34,8 +32,7 @@ struct gnet_stats_basic_packed
+  * @bps: current byte rate
+  * @pps: current packet rate
+  */
+-struct gnet_stats_rate_est
+-{
++struct gnet_stats_rate_est {
+ 	__u32	bps;
+ 	__u32	pps;
+ };
+@@ -48,8 +45,7 @@ struct gnet_stats_rate_est
+  * @requeues: number of requeues
+  * @overlimits: number of enqueues over the limit
+  */
+-struct gnet_stats_queue
+-{
++struct gnet_stats_queue {
+ 	__u32	qlen;
+ 	__u32	backlog;
+ 	__u32	drops;
+@@ -62,8 +58,7 @@ struct gnet_stats_queue
+  * @interval: sampling period
+  * @ewma_log: the log of measurement window weight
+  */
+-struct gnet_estimator
+-{
++struct gnet_estimator {
+ 	signed char	interval;
+ 	unsigned char	ewma_log;
+ };
+diff --git a/include/linux/if.h b/include/linux/if.h
+index 010a0d2..51fcf6a 100644
+--- a/include/linux/if.h
++++ b/include/linux/if.h
+@@ -70,6 +70,7 @@
+ #define IFF_XMIT_DST_RELEASE 0x400	/* dev_hard_start_xmit() is allowed to
+ 					 * release skb->dst
+ 					 */
++#define IFF_DONT_BRIDGE 0x800		/* disallow bridging this ether dev */
+ 
+ #define IF_GET_IFACE	0x0001		/* for querying only */
+ #define IF_GET_PROTO	0x0002
+@@ -125,8 +126,7 @@ enum {
+  *	being very small might be worth keeping for clean configuration.
+  */
+ 
+-struct ifmap 
+-{
++struct ifmap {
+ 	unsigned long mem_start;
+ 	unsigned long mem_end;
+ 	unsigned short base_addr; 
+@@ -136,8 +136,7 @@ struct ifmap
+ 	/* 3 bytes spare */
+ };
+ 
+-struct if_settings
+-{
++struct if_settings {
+ 	unsigned int type;	/* Type of physical device or protocol */
+ 	unsigned int size;	/* Size of the data allocated by the caller */
+ 	union {
+@@ -161,8 +160,7 @@ struct if_settings
+  * remainder may be interface specific.
+  */
+ 
+-struct ifreq 
+-{
++struct ifreq {
+ #define IFHWADDRLEN	6
+ 	union
+ 	{
+@@ -211,11 +209,9 @@ struct ifreq
+  * must know all networks accessible).
+  */
+ 
+-struct ifconf 
+-{
++struct ifconf  {
+ 	int	ifc_len;			/* size of buffer	*/
+-	union 
+-	{
++	union {
+ 		char *ifcu_buf;
+ 		struct ifreq *ifcu_req;
+ 	} ifc_ifcu;
+diff --git a/include/linux/if_addr.h b/include/linux/if_addr.h
+index 41b0193..58b39f4 100644
+--- a/include/linux/if_addr.h
++++ b/include/linux/if_addr.h
+@@ -4,8 +4,7 @@
+ #include <linux/types.h>
+ #include <linux/netlink.h>
+ 
+-struct ifaddrmsg
+-{
++struct ifaddrmsg {
+ 	__u8		ifa_family;
+ 	__u8		ifa_prefixlen;	/* The prefix length		*/
+ 	__u8		ifa_flags;	/* Flags			*/
+@@ -20,8 +19,7 @@ struct ifaddrmsg
+  * but for point-to-point IFA_ADDRESS is DESTINATION address,
+  * local address is supplied in IFA_LOCAL attribute.
+  */
+-enum
+-{
++enum {
+ 	IFA_UNSPEC,
+ 	IFA_ADDRESS,
+ 	IFA_LOCAL,
+@@ -47,8 +45,7 @@ enum
+ #define IFA_F_TENTATIVE		0x40
+ #define IFA_F_PERMANENT		0x80
+ 
+-struct ifa_cacheinfo
+-{
++struct ifa_cacheinfo {
+ 	__u32	ifa_prefered;
+ 	__u32	ifa_valid;
+ 	__u32	cstamp; /* created timestamp, hundredths of seconds */
+diff --git a/include/linux/if_addrlabel.h b/include/linux/if_addrlabel.h
+index 89571f6..54580c2 100644
+--- a/include/linux/if_addrlabel.h
++++ b/include/linux/if_addrlabel.h
+@@ -12,8 +12,7 @@
+ 
+ #include <linux/types.h>
+ 
+-struct ifaddrlblmsg
+-{
++struct ifaddrlblmsg {
+ 	__u8		ifal_family;		/* Address family */
+ 	__u8		__ifal_reserved;	/* Reserved */
+ 	__u8		ifal_prefixlen;		/* Prefix length */
+@@ -22,8 +21,7 @@ struct ifaddrlblmsg
+ 	__u32		ifal_seq;		/* sequence number */
+ };
+ 
+-enum
+-{
++enum {
+ 	IFAL_ADDRESS = 1,
+ 	IFAL_LABEL = 2,
+ 	__IFAL_MAX
+diff --git a/include/linux/if_arp.h b/include/linux/if_arp.h
+index 57a8f38..cafee45 100644
+--- a/include/linux/if_arp.h
++++ b/include/linux/if_arp.h
+@@ -133,8 +133,7 @@ struct arpreq_old {
+  *	This structure defines an ethernet arp header.
+  */
+ 
+-struct arphdr
+-{
++struct arphdr {
+ 	__be16		ar_hrd;		/* format of hardware address	*/
+ 	__be16		ar_pro;		/* format of protocol address	*/
+ 	unsigned char	ar_hln;		/* length of hardware address	*/
+diff --git a/include/linux/if_link.h b/include/linux/if_link.h
+index b0b9e8a..cbefb3b 100644
+--- a/include/linux/if_link.h
++++ b/include/linux/if_link.h
+@@ -5,8 +5,7 @@
+ #include <linux/netlink.h>
+ 
+ /* The struct should be in sync with struct net_device_stats */
+-struct rtnl_link_stats
+-{
++struct rtnl_link_stats {
+ 	__u32	rx_packets;		/* total packets received	*/
+ 	__u32	tx_packets;		/* total packets transmitted	*/
+ 	__u32	rx_bytes;		/* total bytes received 	*/
+@@ -39,8 +38,7 @@ struct rtnl_link_stats
+ };
+ 
+ /* The struct should be in sync with struct ifmap */
+-struct rtnl_link_ifmap
+-{
++struct rtnl_link_ifmap {
+ 	__u64	mem_start;
+ 	__u64	mem_end;
+ 	__u64	base_addr;
+@@ -49,8 +47,7 @@ struct rtnl_link_ifmap
+ 	__u8	port;
+ };
+ 
+-enum
+-{
++enum {
+ 	IFLA_UNSPEC,
+ 	IFLA_ADDRESS,
+ 	IFLA_BROADCAST,
+@@ -121,8 +118,7 @@ enum
+  */
+ 
+ /* Subtype attributes for IFLA_PROTINFO */
+-enum
+-{
++enum {
+ 	IFLA_INET6_UNSPEC,
+ 	IFLA_INET6_FLAGS,	/* link flags			*/
+ 	IFLA_INET6_CONF,	/* sysctl parameters		*/
+@@ -135,16 +131,14 @@ enum
+ 
+ #define IFLA_INET6_MAX	(__IFLA_INET6_MAX - 1)
+ 
+-struct ifla_cacheinfo
+-{
++struct ifla_cacheinfo {
+ 	__u32	max_reasm_len;
+ 	__u32	tstamp;		/* ipv6InterfaceTable updated timestamp */
+ 	__u32	reachable_time;
+ 	__u32	retrans_time;
+ };
+ 
+-enum
+-{
++enum {
+ 	IFLA_INFO_UNSPEC,
+ 	IFLA_INFO_KIND,
+ 	IFLA_INFO_DATA,
+@@ -156,8 +150,7 @@ enum
+ 
+ /* VLAN section */
+ 
+-enum
+-{
++enum {
+ 	IFLA_VLAN_UNSPEC,
+ 	IFLA_VLAN_ID,
+ 	IFLA_VLAN_FLAGS,
+@@ -173,8 +166,7 @@ struct ifla_vlan_flags {
+ 	__u32	mask;
+ };
+ 
+-enum
+-{
++enum {
+ 	IFLA_VLAN_QOS_UNSPEC,
+ 	IFLA_VLAN_QOS_MAPPING,
+ 	__IFLA_VLAN_QOS_MAX
+@@ -182,10 +174,24 @@ enum
+ 
+ #define IFLA_VLAN_QOS_MAX	(__IFLA_VLAN_QOS_MAX - 1)
+ 
+-struct ifla_vlan_qos_mapping
+-{
++struct ifla_vlan_qos_mapping {
+ 	__u32 from;
+ 	__u32 to;
+ };
+ 
++/* MACVLAN section */
++enum {
++	IFLA_MACVLAN_UNSPEC,
++	IFLA_MACVLAN_MODE,
++	__IFLA_MACVLAN_MAX,
++};
++
++#define IFLA_MACVLAN_MAX (__IFLA_MACVLAN_MAX - 1)
++
++enum macvlan_mode {
++	MACVLAN_MODE_PRIVATE = 1, /* don't talk to other macvlans */
++	MACVLAN_MODE_VEPA    = 2, /* talk to other ports through ext bridge */
++	MACVLAN_MODE_BRIDGE  = 4, /* talk to bridge ports directly */
++};
++
+ #endif /* _LINUX_IF_LINK_H */
+diff --git a/include/linux/if_tunnel.h b/include/linux/if_tunnel.h
+index 3036cec..6c8d1d1 100644
+--- a/include/linux/if_tunnel.h
++++ b/include/linux/if_tunnel.h
+@@ -12,6 +12,10 @@
+ #define SIOCADDPRL      (SIOCDEVPRIVATE + 5)
+ #define SIOCDELPRL      (SIOCDEVPRIVATE + 6)
+ #define SIOCCHGPRL      (SIOCDEVPRIVATE + 7)
++#define SIOCGET6RD      (SIOCDEVPRIVATE + 8)
++#define SIOCADD6RD      (SIOCDEVPRIVATE + 9)
++#define SIOCDEL6RD      (SIOCDEVPRIVATE + 10)
++#define SIOCCHG6RD      (SIOCDEVPRIVATE + 11)
+ 
+ #define GRE_CSUM	__cpu_to_be16(0x8000)
+ #define GRE_ROUTING	__cpu_to_be16(0x4000)
+@@ -22,8 +26,7 @@
+ #define GRE_FLAGS	__cpu_to_be16(0x00F8)
+ #define GRE_VERSION	__cpu_to_be16(0x0007)
+ 
+-struct ip_tunnel_parm
+-{
++struct ip_tunnel_parm {
+ 	char			name[IFNAMSIZ];
+ 	int			link;
+ 	__be16			i_flags;
+@@ -48,8 +51,14 @@ struct ip_tunnel_prl {
+ /* PRL flags */
+ #define	PRL_DEFAULT		0x0001
+ 
+-enum
+-{
++struct ip_tunnel_6rd {
++	struct in6_addr		prefix;
++	__be32			relay_prefix;
++	__u16			prefixlen;
++	__u16			relay_prefixlen;
++};
++
++enum {
+ 	IFLA_GRE_UNSPEC,
+ 	IFLA_GRE_LINK,
+ 	IFLA_GRE_IFLAGS,
+diff --git a/include/linux/if_vlan.h b/include/linux/if_vlan.h
+index 2dc4a57..329b354 100644
+--- a/include/linux/if_vlan.h
++++ b/include/linux/if_vlan.h
+@@ -33,6 +33,7 @@ enum vlan_ioctl_cmds {
+ enum vlan_flags {
+ 	VLAN_FLAG_REORDER_HDR	= 0x1,
+ 	VLAN_FLAG_GVRP		= 0x2,
++	VLAN_FLAG_LOOSE_BINDING	= 0x4,
+ };
+ 
+ enum vlan_name_types {
+diff --git a/include/linux/neighbour.h b/include/linux/neighbour.h
+index 12c9de1..a7003b7 100644
+--- a/include/linux/neighbour.h
++++ b/include/linux/neighbour.h
+@@ -4,8 +4,7 @@
+ #include <linux/types.h>
+ #include <linux/netlink.h>
+ 
+-struct ndmsg
+-{
++struct ndmsg {
+ 	__u8		ndm_family;
+ 	__u8		ndm_pad1;
+ 	__u16		ndm_pad2;
+@@ -15,8 +14,7 @@ struct ndmsg
+ 	__u8		ndm_type;
+ };
+ 
+-enum
+-{
++enum {
+ 	NDA_UNSPEC,
+ 	NDA_DST,
+ 	NDA_LLADDR,
+@@ -56,8 +54,7 @@ enum
+    NUD_PERMANENT is also cannot be deleted by garbage collectors.
+  */
+ 
+-struct nda_cacheinfo
+-{
++struct nda_cacheinfo {
+ 	__u32		ndm_confirmed;
+ 	__u32		ndm_used;
+ 	__u32		ndm_updated;
+@@ -89,8 +86,7 @@ struct nda_cacheinfo
+  * device.
+  ****/
+ 
+-struct ndt_stats
+-{
++struct ndt_stats {
+ 	__u64		ndts_allocs;
+ 	__u64		ndts_destroys;
+ 	__u64		ndts_hash_grows;
+@@ -124,15 +120,13 @@ enum {
+ };
+ #define NDTPA_MAX (__NDTPA_MAX - 1)
+ 
+-struct ndtmsg
+-{
++struct ndtmsg {
+ 	__u8		ndtm_family;
+ 	__u8		ndtm_pad1;
+ 	__u16		ndtm_pad2;
+ };
+ 
+-struct ndt_config
+-{
++struct ndt_config {
+ 	__u16		ndtc_key_len;
+ 	__u16		ndtc_entry_size;
+ 	__u32		ndtc_entries;
+diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
+index 260f010..9035dfa 100644
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -38,8 +38,7 @@
+  *	with byte counters.
+  */
+ 
+-struct net_device_stats
+-{
++struct net_device_stats {
+ 	unsigned long	rx_packets;		/* total packets received	*/
+ 	unsigned long	tx_packets;		/* total packets transmitted	*/
+ 	unsigned long	rx_bytes;		/* total bytes received 	*/
+diff --git a/include/linux/netfilter/x_tables.h b/include/linux/netfilter/x_tables.h
+index 2794d97..ccb5641 100644
+--- a/include/linux/netfilter/x_tables.h
++++ b/include/linux/netfilter/x_tables.h
+@@ -6,8 +6,7 @@
+ #define XT_FUNCTION_MAXNAMELEN 30
+ #define XT_TABLE_MAXNAMELEN 32
+ 
+-struct xt_entry_match
+-{
++struct xt_entry_match {
+ 	union {
+ 		struct {
+ 			__u16 match_size;
+@@ -31,8 +30,7 @@ struct xt_entry_match
+ 	unsigned char data[0];
+ };
+ 
+-struct xt_entry_target
+-{
++struct xt_entry_target {
+ 	union {
+ 		struct {
+ 			__u16 target_size;
+@@ -64,16 +62,14 @@ struct xt_entry_target
+ 	},								       \
+ }
+ 
+-struct xt_standard_target
+-{
++struct xt_standard_target {
+ 	struct xt_entry_target target;
+ 	int verdict;
+ };
+ 
+ /* The argument to IPT_SO_GET_REVISION_*.  Returns highest revision
+  * kernel supports, if >= revision. */
+-struct xt_get_revision
+-{
++struct xt_get_revision {
+ 	char name[XT_FUNCTION_MAXNAMELEN-1];
+ 
+ 	__u8 revision;
+@@ -90,8 +86,7 @@ struct xt_get_revision
+  * ip6t_entry and arpt_entry.  This sucks, and it is a hack.  It will be my
+  * personal pleasure to remove it -HW
+  */
+-struct _xt_align
+-{
++struct _xt_align {
+ 	__u8 u8;
+ 	__u16 u16;
+ 	__u32 u32;
+@@ -109,14 +104,12 @@ struct _xt_align
+ #define SET_COUNTER(c,b,p) do { (c).bcnt = (b); (c).pcnt = (p); } while(0)
+ #define ADD_COUNTER(c,b,p) do { (c).bcnt += (b); (c).pcnt += (p); } while(0)
+ 
+-struct xt_counters
+-{
++struct xt_counters {
+ 	__u64 pcnt, bcnt;			/* Packet and byte counters */
+ };
+ 
+ /* The argument to IPT_SO_ADD_COUNTERS. */
+-struct xt_counters_info
+-{
++struct xt_counters_info {
+ 	/* Which table. */
+ 	char name[XT_TABLE_MAXNAMELEN];
+ 
+diff --git a/include/linux/netfilter/xt_tcpudp.h b/include/linux/netfilter/xt_tcpudp.h
+index a490a0b..38aa7b3 100644
+--- a/include/linux/netfilter/xt_tcpudp.h
++++ b/include/linux/netfilter/xt_tcpudp.h
+@@ -4,8 +4,7 @@
+ #include <linux/types.h>
+ 
+ /* TCP matching stuff */
+-struct xt_tcp
+-{
++struct xt_tcp {
+ 	__u16 spts[2];			/* Source port range. */
+ 	__u16 dpts[2];			/* Destination port range. */
+ 	__u8 option;			/* TCP Option iff non-zero*/
+@@ -22,8 +21,7 @@ struct xt_tcp
+ #define XT_TCP_INV_MASK		0x0F	/* All possible flags. */
+ 
+ /* UDP matching stuff */
+-struct xt_udp
+-{
++struct xt_udp {
+ 	__u16 spts[2];			/* Source port range. */
+ 	__u16 dpts[2];			/* Destination port range. */
+ 	__u8 invflags;			/* Inverse flags */
+diff --git a/include/linux/netfilter_ipv4/ip_tables.h b/include/linux/netfilter_ipv4/ip_tables.h
+index a9f21c9..735f4b1 100644
+--- a/include/linux/netfilter_ipv4/ip_tables.h
++++ b/include/linux/netfilter_ipv4/ip_tables.h
+@@ -70,8 +70,7 @@ struct ipt_ip {
+ /* This structure defines each of the firewall rules.  Consists of 3
+    parts which are 1) general IP header stuff 2) match specific
+    stuff 3) the target to perform if the rule matches */
+-struct ipt_entry
+-{
++struct ipt_entry {
+ 	struct ipt_ip ip;
+ 
+ 	/* Mark with fields that we care about. */
+@@ -129,8 +128,7 @@ struct ipt_entry
+ #define IPT_UDP_INV_MASK	XT_UDP_INV_MASK
+ 
+ /* ICMP matching stuff */
+-struct ipt_icmp
+-{
++struct ipt_icmp {
+ 	u_int8_t type;				/* type to match */
+ 	u_int8_t code[2];			/* range of code */
+ 	u_int8_t invflags;			/* Inverse flags */
+@@ -140,8 +138,7 @@ struct ipt_icmp
+ #define IPT_ICMP_INV	0x01	/* Invert the sense of type/code test */
+ 
+ /* The argument to IPT_SO_GET_INFO */
+-struct ipt_getinfo
+-{
++struct ipt_getinfo {
+ 	/* Which table: caller fills this in. */
+ 	char name[IPT_TABLE_MAXNAMELEN];
+ 
+@@ -163,8 +160,7 @@ struct ipt_getinfo
+ };
+ 
+ /* The argument to IPT_SO_SET_REPLACE. */
+-struct ipt_replace
+-{
++struct ipt_replace {
+ 	/* Which table. */
+ 	char name[IPT_TABLE_MAXNAMELEN];
+ 
+@@ -198,8 +194,7 @@ struct ipt_replace
+ #define ipt_counters_info xt_counters_info
+ 
+ /* The argument to IPT_SO_GET_ENTRIES. */
+-struct ipt_get_entries
+-{
++struct ipt_get_entries {
+ 	/* Which table: user fills this in. */
+ 	char name[IPT_TABLE_MAXNAMELEN];
+ 
+diff --git a/include/linux/netlink.h b/include/linux/netlink.h
+index ec780bb..958b7f8 100644
+--- a/include/linux/netlink.h
++++ b/include/linux/netlink.h
+@@ -29,16 +29,14 @@
+ 
+ struct net;
+ 
+-struct sockaddr_nl
+-{
++struct sockaddr_nl {
+ 	sa_family_t	nl_family;	/* AF_NETLINK	*/
+ 	unsigned short	nl_pad;		/* zero		*/
+ 	__u32		nl_pid;		/* port ID	*/
+        	__u32		nl_groups;	/* multicast groups mask */
+ };
+ 
+-struct nlmsghdr
+-{
++struct nlmsghdr {
+ 	__u32		nlmsg_len;	/* Length of message including header */
+ 	__u16		nlmsg_type;	/* Message content */
+ 	__u16		nlmsg_flags;	/* Additional flags */
+@@ -94,8 +92,7 @@ struct nlmsghdr
+ 
+ #define NLMSG_MIN_TYPE		0x10	/* < 0x10: reserved control messages */
+ 
+-struct nlmsgerr
+-{
++struct nlmsgerr {
+ 	int		error;
+ 	struct nlmsghdr msg;
+ };
+@@ -106,8 +103,7 @@ struct nlmsgerr
+ #define NETLINK_BROADCAST_ERROR	4
+ #define NETLINK_NO_ENOBUFS	5
+ 
+-struct nl_pktinfo
+-{
++struct nl_pktinfo {
+ 	__u32	group;
+ };
+ 
+@@ -127,8 +123,7 @@ enum {
+  *  <-------------- nlattr->nla_len -------------->
+  */
+ 
+-struct nlattr
+-{
++struct nlattr {
+ 	__u16           nla_len;
+ 	__u16           nla_type;
+ };
+diff --git a/include/linux/pkt_cls.h b/include/linux/pkt_cls.h
+index 3c842ed..7f6ba86 100644
+--- a/include/linux/pkt_cls.h
++++ b/include/linux/pkt_cls.h
+@@ -75,8 +75,7 @@ bits 9,10,11: redirect counter -  redirect TTL. Loop avoidance
+ #define SET_TC_AT(v,n)   ((V_TC_AT(n)) | (v & ~M_TC_AT))
+ 
+ /* Action attributes */
+-enum
+-{
++enum {
+ 	TCA_ACT_UNSPEC,
+ 	TCA_ACT_KIND,
+ 	TCA_ACT_OPTIONS,
+@@ -108,8 +107,7 @@ enum
+ #define TC_ACT_JUMP		0x10000000
+ 
+ /* Action type identifiers*/
+-enum
+-{
++enum {
+ 	TCA_ID_UNSPEC=0,
+ 	TCA_ID_POLICE=1,
+ 	/* other actions go here */
+@@ -118,8 +116,7 @@ enum
+ 
+ #define TCA_ID_MAX __TCA_ID_MAX
+ 
+-struct tc_police
+-{
++struct tc_police {
+ 	__u32			index;
+ 	int			action;
+ #define TC_POLICE_UNSPEC	TC_ACT_UNSPEC
+@@ -138,15 +135,13 @@ struct tc_police
+ 	__u32			capab;
+ };
+ 
+-struct tcf_t
+-{
++struct tcf_t {
+ 	__u64   install;
+ 	__u64   lastuse;
+ 	__u64   expires;
+ };
+ 
+-struct tc_cnt
+-{
++struct tc_cnt {
+ 	int                   refcnt; 
+ 	int                   bindcnt;
+ };
+@@ -158,8 +153,7 @@ struct tc_cnt
+ 	int                   refcnt; \
+ 	int                   bindcnt
+ 
+-enum
+-{
++enum {
+ 	TCA_POLICE_UNSPEC,
+ 	TCA_POLICE_TBF,
+ 	TCA_POLICE_RATE,
+@@ -182,8 +176,7 @@ enum
+ #define TC_U32_UNSPEC	0
+ #define TC_U32_ROOT	(0xFFF00000)
+ 
+-enum
+-{
++enum {
+ 	TCA_U32_UNSPEC,
+ 	TCA_U32_CLASSID,
+ 	TCA_U32_HASH,
+@@ -200,16 +193,14 @@ enum
+ 
+ #define TCA_U32_MAX (__TCA_U32_MAX - 1)
+ 
+-struct tc_u32_key
+-{
++struct tc_u32_key {
+ 	__be32		mask;
+ 	__be32		val;
+ 	int		off;
+ 	int		offmask;
+ };
+ 
+-struct tc_u32_sel
+-{
++struct tc_u32_sel {
+ 	unsigned char		flags;
+ 	unsigned char		offshift;
+ 	unsigned char		nkeys;
+@@ -223,15 +214,13 @@ struct tc_u32_sel
+ 	struct tc_u32_key	keys[0];
+ };
+ 
+-struct tc_u32_mark
+-{
++struct tc_u32_mark {
+ 	__u32		val;
+ 	__u32		mask;
+ 	__u32		success;
+ };
+ 
+-struct tc_u32_pcnt
+-{
++struct tc_u32_pcnt {
+ 	__u64 rcnt;
+ 	__u64 rhit;
+ 	__u64 kcnts[0];
+@@ -249,8 +238,7 @@ struct tc_u32_pcnt
+ 
+ /* RSVP filter */
+ 
+-enum
+-{
++enum {
+ 	TCA_RSVP_UNSPEC,
+ 	TCA_RSVP_CLASSID,
+ 	TCA_RSVP_DST,
+@@ -263,15 +251,13 @@ enum
+ 
+ #define TCA_RSVP_MAX (__TCA_RSVP_MAX - 1 )
+ 
+-struct tc_rsvp_gpi
+-{
++struct tc_rsvp_gpi {
+ 	__u32	key;
+ 	__u32	mask;
+ 	int	offset;
+ };
+ 
+-struct tc_rsvp_pinfo
+-{
++struct tc_rsvp_pinfo {
+ 	struct tc_rsvp_gpi dpi;
+ 	struct tc_rsvp_gpi spi;
+ 	__u8	protocol;
+@@ -282,8 +268,7 @@ struct tc_rsvp_pinfo
+ 
+ /* ROUTE filter */
+ 
+-enum
+-{
++enum {
+ 	TCA_ROUTE4_UNSPEC,
+ 	TCA_ROUTE4_CLASSID,
+ 	TCA_ROUTE4_TO,
+@@ -299,8 +284,7 @@ enum
+ 
+ /* FW filter */
+ 
+-enum
+-{
++enum {
+ 	TCA_FW_UNSPEC,
+ 	TCA_FW_CLASSID,
+ 	TCA_FW_POLICE,
+@@ -314,8 +298,7 @@ enum
+ 
+ /* TC index filter */
+ 
+-enum
+-{
++enum {
+ 	TCA_TCINDEX_UNSPEC,
+ 	TCA_TCINDEX_HASH,
+ 	TCA_TCINDEX_MASK,
+@@ -331,8 +314,7 @@ enum
+ 
+ /* Flow filter */
+ 
+-enum
+-{
++enum {
+ 	FLOW_KEY_SRC,
+ 	FLOW_KEY_DST,
+ 	FLOW_KEY_PROTO,
+@@ -355,14 +337,12 @@ enum
+ 
+ #define FLOW_KEY_MAX	(__FLOW_KEY_MAX - 1)
+ 
+-enum
+-{
++enum {
+ 	FLOW_MODE_MAP,
+ 	FLOW_MODE_HASH,
+ };
+ 
+-enum
+-{
++enum {
+ 	TCA_FLOW_UNSPEC,
+ 	TCA_FLOW_KEYS,
+ 	TCA_FLOW_MODE,
+@@ -383,8 +363,7 @@ enum
+ 
+ /* Basic filter */
+ 
+-enum
+-{
++enum {
+ 	TCA_BASIC_UNSPEC,
+ 	TCA_BASIC_CLASSID,
+ 	TCA_BASIC_EMATCHES,
+@@ -398,8 +377,7 @@ enum
+ 
+ /* Cgroup classifier */
+ 
+-enum
+-{
++enum {
+ 	TCA_CGROUP_UNSPEC,
+ 	TCA_CGROUP_ACT,
+ 	TCA_CGROUP_POLICE,
+@@ -411,14 +389,12 @@ enum
+ 
+ /* Extended Matches */
+ 
+-struct tcf_ematch_tree_hdr
+-{
++struct tcf_ematch_tree_hdr {
+ 	__u16		nmatches;
+ 	__u16		progid;
+ };
+ 
+-enum
+-{
++enum {
+ 	TCA_EMATCH_TREE_UNSPEC,
+ 	TCA_EMATCH_TREE_HDR,
+ 	TCA_EMATCH_TREE_LIST,
+@@ -426,8 +402,7 @@ enum
+ };
+ #define TCA_EMATCH_TREE_MAX (__TCA_EMATCH_TREE_MAX - 1)
+ 
+-struct tcf_ematch_hdr
+-{
++struct tcf_ematch_hdr {
+ 	__u16		matchid;
+ 	__u16		kind;
+ 	__u16		flags;
+@@ -457,8 +432,7 @@ struct tcf_ematch_hdr
+ #define TCF_EM_REL_MASK	3
+ #define TCF_EM_REL_VALID(v) (((v) & TCF_EM_REL_MASK) != TCF_EM_REL_MASK)
+ 
+-enum
+-{
++enum {
+ 	TCF_LAYER_LINK,
+ 	TCF_LAYER_NETWORK,
+ 	TCF_LAYER_TRANSPORT,
+@@ -479,13 +453,11 @@ enum
+ #define        TCF_EM_VLAN		6
+ #define	TCF_EM_MAX		6
+ 
+-enum
+-{
++enum {
+ 	TCF_EM_PROG_TC
+ };
+ 
+-enum
+-{
++enum {
+ 	TCF_EM_OPND_EQ,
+ 	TCF_EM_OPND_GT,
+ 	TCF_EM_OPND_LT
+diff --git a/include/linux/pkt_sched.h b/include/linux/pkt_sched.h
+index d51a2b3..2cfa4bc 100644
+--- a/include/linux/pkt_sched.h
++++ b/include/linux/pkt_sched.h
+@@ -29,8 +29,7 @@
+    Particular schedulers may have also their private records.
+  */
+ 
+-struct tc_stats
+-{
++struct tc_stats {
+ 	__u64	bytes;			/* NUmber of enqueues bytes */
+ 	__u32	packets;		/* Number of enqueued packets	*/
+ 	__u32	drops;			/* Packets dropped because of lack of resources */
+@@ -42,8 +41,7 @@ struct tc_stats
+ 	__u32	backlog;
+ };
+ 
+-struct tc_estimator
+-{
++struct tc_estimator {
+ 	signed char	interval;
+ 	unsigned char	ewma_log;
+ };
+@@ -75,8 +73,7 @@ struct tc_estimator
+ #define TC_H_ROOT	(0xFFFFFFFFU)
+ #define TC_H_INGRESS    (0xFFFFFFF1U)
+ 
+-struct tc_ratespec
+-{
++struct tc_ratespec {
+ 	unsigned char	cell_log;
+ 	unsigned char	__reserved;
+ 	unsigned short	overhead;
+@@ -109,8 +106,7 @@ enum {
+ 
+ /* FIFO section */
+ 
+-struct tc_fifo_qopt
+-{
++struct tc_fifo_qopt {
+ 	__u32	limit;	/* Queue length: bytes for bfifo, packets for pfifo */
+ };
+ 
+@@ -119,8 +115,7 @@ struct tc_fifo_qopt
+ #define TCQ_PRIO_BANDS	16
+ #define TCQ_MIN_PRIO_BANDS 2
+ 
+-struct tc_prio_qopt
+-{
++struct tc_prio_qopt {
+ 	int	bands;			/* Number of bands */
+ 	__u8	priomap[TC_PRIO_MAX+1];	/* Map: logical priority -> PRIO band */
+ };
+@@ -134,8 +129,7 @@ struct tc_multiq_qopt {
+ 
+ /* TBF section */
+ 
+-struct tc_tbf_qopt
+-{
++struct tc_tbf_qopt {
+ 	struct tc_ratespec rate;
+ 	struct tc_ratespec peakrate;
+ 	__u32		limit;
+@@ -143,8 +137,7 @@ struct tc_tbf_qopt
+ 	__u32		mtu;
+ };
+ 
+-enum
+-{
++enum {
+ 	TCA_TBF_UNSPEC,
+ 	TCA_TBF_PARMS,
+ 	TCA_TBF_RTAB,
+@@ -161,8 +154,7 @@ enum
+ 
+ /* SFQ section */
+ 
+-struct tc_sfq_qopt
+-{
++struct tc_sfq_qopt {
+ 	unsigned	quantum;	/* Bytes per round allocated to flow */
+ 	int		perturb_period;	/* Period of hash perturbation */
+ 	__u32		limit;		/* Maximal packets in queue */
+@@ -170,8 +162,7 @@ struct tc_sfq_qopt
+ 	unsigned	flows;		/* Maximal number of flows  */
+ };
+ 
+-struct tc_sfq_xstats
+-{
++struct tc_sfq_xstats {
+ 	__s32		allot;
+ };
+ 
+@@ -186,8 +177,7 @@ struct tc_sfq_xstats
+ 
+ /* RED section */
+ 
+-enum
+-{
++enum {
+ 	TCA_RED_UNSPEC,
+ 	TCA_RED_PARMS,
+ 	TCA_RED_STAB,
+@@ -196,8 +186,7 @@ enum
+ 
+ #define TCA_RED_MAX (__TCA_RED_MAX - 1)
+ 
+-struct tc_red_qopt
+-{
++struct tc_red_qopt {
+ 	__u32		limit;		/* HARD maximal queue length (bytes)	*/
+ 	__u32		qth_min;	/* Min average length threshold (bytes) */
+ 	__u32		qth_max;	/* Max average length threshold (bytes) */
+@@ -209,8 +198,7 @@ struct tc_red_qopt
+ #define TC_RED_HARDDROP	2
+ };
+ 
+-struct tc_red_xstats
+-{
++struct tc_red_xstats {
+ 	__u32           early;          /* Early drops */
+ 	__u32           pdrop;          /* Drops due to queue limits */
+ 	__u32           other;          /* Drops due to drop() calls */
+@@ -221,8 +209,7 @@ struct tc_red_xstats
+ 
+ #define MAX_DPs 16
+ 
+-enum
+-{
++enum {
+        TCA_GRED_UNSPEC,
+        TCA_GRED_PARMS,
+        TCA_GRED_STAB,
+@@ -232,8 +219,7 @@ enum
+ 
+ #define TCA_GRED_MAX (__TCA_GRED_MAX - 1)
+ 
+-struct tc_gred_qopt
+-{
++struct tc_gred_qopt {
+ 	__u32		limit;        /* HARD maximal queue length (bytes)    */
+ 	__u32		qth_min;      /* Min average length threshold (bytes) */
+ 	__u32		qth_max;      /* Max average length threshold (bytes) */
+@@ -253,8 +239,7 @@ struct tc_gred_qopt
+ };
+ 
+ /* gred setup */
+-struct tc_gred_sopt
+-{
++struct tc_gred_sopt {
+ 	__u32		DPs;
+ 	__u32		def_DP;
+ 	__u8		grio;
+@@ -267,8 +252,7 @@ struct tc_gred_sopt
+ #define TC_HTB_MAXDEPTH		8
+ #define TC_HTB_PROTOVER		3 /* the same as HTB and TC's major */
+ 
+-struct tc_htb_opt
+-{
++struct tc_htb_opt {
+ 	struct tc_ratespec 	rate;
+ 	struct tc_ratespec 	ceil;
+ 	__u32	buffer;
+@@ -277,8 +261,7 @@ struct tc_htb_opt
+ 	__u32	level;		/* out only */
+ 	__u32	prio;
+ };
+-struct tc_htb_glob
+-{
++struct tc_htb_glob {
+ 	__u32 version;		/* to match HTB/TC */
+     	__u32 rate2quantum;	/* bps->quantum divisor */
+     	__u32 defcls;		/* default class number */
+@@ -287,8 +270,7 @@ struct tc_htb_glob
+ 	/* stats */
+ 	__u32 direct_pkts; /* count of non shapped packets */
+ };
+-enum
+-{
++enum {
+ 	TCA_HTB_UNSPEC,
+ 	TCA_HTB_PARMS,
+ 	TCA_HTB_INIT,
+@@ -299,8 +281,7 @@ enum
+ 
+ #define TCA_HTB_MAX (__TCA_HTB_MAX - 1)
+ 
+-struct tc_htb_xstats
+-{
++struct tc_htb_xstats {
+ 	__u32 lends;
+ 	__u32 borrows;
+ 	__u32 giants;	/* too big packets (rate will not be accurate) */
+@@ -310,28 +291,24 @@ struct tc_htb_xstats
+ 
+ /* HFSC section */
+ 
+-struct tc_hfsc_qopt
+-{
++struct tc_hfsc_qopt {
+ 	__u16	defcls;		/* default class */
+ };
+ 
+-struct tc_service_curve
+-{
++struct tc_service_curve {
+ 	__u32	m1;		/* slope of the first segment in bps */
+ 	__u32	d;		/* x-projection of the first segment in us */
+ 	__u32	m2;		/* slope of the second segment in bps */
+ };
+ 
+-struct tc_hfsc_stats
+-{
++struct tc_hfsc_stats {
+ 	__u64	work;		/* total work done */
+ 	__u64	rtwork;		/* work done by real-time criteria */
+ 	__u32	period;		/* current period */
+ 	__u32	level;		/* class level in hierarchy */
+ };
+ 
+-enum
+-{
++enum {
+ 	TCA_HFSC_UNSPEC,
+ 	TCA_HFSC_RSC,
+ 	TCA_HFSC_FSC,
+@@ -348,8 +325,7 @@ enum
+ #define TC_CBQ_MAXLEVEL		8
+ #define TC_CBQ_DEF_EWMA		5
+ 
+-struct tc_cbq_lssopt
+-{
++struct tc_cbq_lssopt {
+ 	unsigned char	change;
+ 	unsigned char	flags;
+ #define TCF_CBQ_LSS_BOUNDED	1
+@@ -368,8 +344,7 @@ struct tc_cbq_lssopt
+ 	__u32		avpkt;
+ };
+ 
+-struct tc_cbq_wrropt
+-{
++struct tc_cbq_wrropt {
+ 	unsigned char	flags;
+ 	unsigned char	priority;
+ 	unsigned char	cpriority;
+@@ -378,8 +353,7 @@ struct tc_cbq_wrropt
+ 	__u32		weight;
+ };
+ 
+-struct tc_cbq_ovl
+-{
++struct tc_cbq_ovl {
+ 	unsigned char	strategy;
+ #define	TC_CBQ_OVL_CLASSIC	0
+ #define	TC_CBQ_OVL_DELAY	1
+@@ -391,30 +365,26 @@ struct tc_cbq_ovl
+ 	__u32		penalty;
+ };
+ 
+-struct tc_cbq_police
+-{
++struct tc_cbq_police {
+ 	unsigned char	police;
+ 	unsigned char	__res1;
+ 	unsigned short	__res2;
+ };
+ 
+-struct tc_cbq_fopt
+-{
++struct tc_cbq_fopt {
+ 	__u32		split;
+ 	__u32		defmap;
+ 	__u32		defchange;
+ };
+ 
+-struct tc_cbq_xstats
+-{
++struct tc_cbq_xstats {
+ 	__u32		borrows;
+ 	__u32		overactions;
+ 	__s32		avgidle;
+ 	__s32		undertime;
+ };
+ 
+-enum
+-{
++enum {
+ 	TCA_CBQ_UNSPEC,
+ 	TCA_CBQ_LSSOPT,
+ 	TCA_CBQ_WRROPT,
+@@ -459,8 +429,7 @@ enum {
+ 
+ /* Network emulator */
+ 
+-enum
+-{
++enum {
+ 	TCA_NETEM_UNSPEC,
+ 	TCA_NETEM_CORR,
+ 	TCA_NETEM_DELAY_DIST,
+@@ -471,8 +440,7 @@ enum
+ 
+ #define TCA_NETEM_MAX (__TCA_NETEM_MAX - 1)
+ 
+-struct tc_netem_qopt
+-{
++struct tc_netem_qopt {
+ 	__u32	latency;	/* added delay (us) */
+ 	__u32   limit;		/* fifo limit (packets) */
+ 	__u32	loss;		/* random packet loss (0=none ~0=100%) */
+@@ -481,21 +449,18 @@ struct tc_netem_qopt
+ 	__u32	jitter;		/* random jitter in latency (us) */
+ };
+ 
+-struct tc_netem_corr
+-{
++struct tc_netem_corr {
+ 	__u32	delay_corr;	/* delay correlation */
+ 	__u32	loss_corr;	/* packet loss correlation */
+ 	__u32	dup_corr;	/* duplicate correlation  */
+ };
+ 
+-struct tc_netem_reorder
+-{
++struct tc_netem_reorder {
+ 	__u32	probability;
+ 	__u32	correlation;
+ };
+ 
+-struct tc_netem_corrupt
+-{
++struct tc_netem_corrupt {
+ 	__u32	probability;
+ 	__u32	correlation;
+ };
+@@ -504,8 +469,7 @@ struct tc_netem_corrupt
+ 
+ /* DRR */
+ 
+-enum
+-{
++enum {
+ 	TCA_DRR_UNSPEC,
+ 	TCA_DRR_QUANTUM,
+ 	__TCA_DRR_MAX
+@@ -513,8 +477,7 @@ enum
+ 
+ #define TCA_DRR_MAX	(__TCA_DRR_MAX - 1)
+ 
+-struct tc_drr_stats
+-{
++struct tc_drr_stats {
+ 	__u32	deficit;
+ };
+ 
+diff --git a/include/linux/rtnetlink.h b/include/linux/rtnetlink.h
+index e862380..5b46173 100644
+--- a/include/linux/rtnetlink.h
++++ b/include/linux/rtnetlink.h
+@@ -127,8 +127,7 @@ enum {
+    with attribute type.
+  */
+ 
+-struct rtattr
+-{
++struct rtattr {
+ 	unsigned short	rta_len;
+ 	unsigned short	rta_type;
+ };
+@@ -154,8 +153,7 @@ struct rtattr
+  *		Definitions used in routing table administration.
+  ****/
+ 
+-struct rtmsg
+-{
++struct rtmsg {
+ 	unsigned char		rtm_family;
+ 	unsigned char		rtm_dst_len;
+ 	unsigned char		rtm_src_len;
+@@ -171,8 +169,7 @@ struct rtmsg
+ 
+ /* rtm_type */
+ 
+-enum
+-{
++enum {
+ 	RTN_UNSPEC,
+ 	RTN_UNICAST,		/* Gateway or direct route	*/
+ 	RTN_LOCAL,		/* Accept locally		*/
+@@ -230,8 +227,7 @@ enum
+    could be assigned a value between UNIVERSE and LINK.
+ */
+ 
+-enum rt_scope_t
+-{
++enum rt_scope_t {
+ 	RT_SCOPE_UNIVERSE=0,
+ /* User defined values  */
+ 	RT_SCOPE_SITE=200,
+@@ -249,8 +245,7 @@ enum rt_scope_t
+ 
+ /* Reserved table identifiers */
+ 
+-enum rt_class_t
+-{
++enum rt_class_t {
+ 	RT_TABLE_UNSPEC=0,
+ /* User defined values */
+ 	RT_TABLE_COMPAT=252,
+@@ -263,8 +258,7 @@ enum rt_class_t
+ 
+ /* Routing message attributes */
+ 
+-enum rtattr_type_t
+-{
++enum rtattr_type_t {
+ 	RTA_UNSPEC,
+ 	RTA_DST,
+ 	RTA_SRC,
+@@ -298,8 +292,7 @@ enum rtattr_type_t
+  * and rtt for different paths from multipath.
+  */
+ 
+-struct rtnexthop
+-{
++struct rtnexthop {
+ 	unsigned short		rtnh_len;
+ 	unsigned char		rtnh_flags;
+ 	unsigned char		rtnh_hops;
+@@ -325,8 +318,7 @@ struct rtnexthop
+ 
+ /* RTM_CACHEINFO */
+ 
+-struct rta_cacheinfo
+-{
++struct rta_cacheinfo {
+ 	__u32	rta_clntref;
+ 	__u32	rta_lastuse;
+ 	__s32	rta_expires;
+@@ -341,8 +333,7 @@ struct rta_cacheinfo
+ 
+ /* RTM_METRICS --- array of struct rtattr with types of RTAX_* */
+ 
+-enum
+-{
++enum {
+ 	RTAX_UNSPEC,
+ #define RTAX_UNSPEC RTAX_UNSPEC
+ 	RTAX_LOCK,
+@@ -381,8 +372,7 @@ enum
+ #define RTAX_FEATURE_TIMESTAMP	0x00000004
+ #define RTAX_FEATURE_ALLFRAG	0x00000008
+ 
+-struct rta_session
+-{
++struct rta_session {
+ 	__u8	proto;
+ 	__u8	pad1;
+ 	__u16	pad2;
+@@ -407,8 +397,7 @@ struct rta_session
+  *		General form of address family dependent message.
+  ****/
+ 
+-struct rtgenmsg
+-{
++struct rtgenmsg {
+ 	unsigned char		rtgen_family;
+ };
+ 
+@@ -421,8 +410,7 @@ struct rtgenmsg
+  * on network protocol.
+  */
+ 
+-struct ifinfomsg
+-{
++struct ifinfomsg {
+ 	unsigned char	ifi_family;
+ 	unsigned char	__ifi_pad;
+ 	unsigned short	ifi_type;		/* ARPHRD_* */
+@@ -435,8 +423,7 @@ struct ifinfomsg
+  *		prefix information 
+  ****/
+ 
+-struct prefixmsg
+-{
++struct prefixmsg {
+ 	unsigned char	prefix_family;
+ 	unsigned char	prefix_pad1;
+ 	unsigned short	prefix_pad2;
+@@ -457,8 +444,7 @@ enum
+ 
+ #define PREFIX_MAX	(__PREFIX_MAX - 1)
+ 
+-struct prefix_cacheinfo
+-{
++struct prefix_cacheinfo {
+ 	__u32	preferred_time;
+ 	__u32	valid_time;
+ };
+@@ -468,8 +454,7 @@ struct prefix_cacheinfo
+  *		Traffic control messages.
+  ****/
+ 
+-struct tcmsg
+-{
++struct tcmsg {
+ 	unsigned char	tcm_family;
+ 	unsigned char	tcm__pad1;
+ 	unsigned short	tcm__pad2;
+@@ -479,8 +464,7 @@ struct tcmsg
+ 	__u32		tcm_info;
+ };
+ 
+-enum
+-{
++enum {
+ 	TCA_UNSPEC,
+ 	TCA_KIND,
+ 	TCA_OPTIONS,
+@@ -502,8 +486,7 @@ enum
+  *		Neighbor Discovery userland options
+  ****/
+ 
+-struct nduseroptmsg
+-{
++struct nduseroptmsg {
+ 	unsigned char	nduseropt_family;
+ 	unsigned char	nduseropt_pad1;
+ 	unsigned short	nduseropt_opts_len;	/* Total length of options */
+@@ -515,8 +498,7 @@ struct nduseroptmsg
+ 	/* Followed by one or more ND options */
+ };
+ 
+-enum
+-{
++enum {
+ 	NDUSEROPT_UNSPEC,
+ 	NDUSEROPT_SRCADDR,
+ 	__NDUSEROPT_MAX
+@@ -596,8 +578,7 @@ enum rtnetlink_groups {
+ #define RTNLGRP_MAX	(__RTNLGRP_MAX - 1)
+ 
+ /* TC action piece */
+-struct tcamsg
+-{
++struct tcamsg {
+ 	unsigned char	tca_family;
+ 	unsigned char	tca__pad1;
+ 	unsigned short	tca__pad2;
+diff --git a/include/linux/tc_act/tc_gact.h b/include/linux/tc_act/tc_gact.h
+index e895c0a..f7bf94e 100644
+--- a/include/linux/tc_act/tc_gact.h
++++ b/include/linux/tc_act/tc_gact.h
+@@ -5,14 +5,12 @@
+ #include <linux/pkt_cls.h>
+ 
+ #define TCA_ACT_GACT 5
+-struct tc_gact
+-{
++struct tc_gact {
+ 	tc_gen;
+ 
+ };
+ 
+-struct tc_gact_p
+-{
++struct tc_gact_p {
+ #define PGACT_NONE              0
+ #define PGACT_NETRAND           1
+ #define PGACT_DETERM            2
+@@ -22,8 +20,7 @@ struct tc_gact_p
+ 	int                   paction;
+ };
+  
+-enum
+-{
++enum {
+ 	TCA_GACT_UNSPEC,
+ 	TCA_GACT_TM,
+ 	TCA_GACT_PARMS,
+diff --git a/include/linux/tc_act/tc_ipt.h b/include/linux/tc_act/tc_ipt.h
+index 4b6f7b6..a233556 100644
+--- a/include/linux/tc_act/tc_ipt.h
++++ b/include/linux/tc_act/tc_ipt.h
+@@ -5,8 +5,7 @@
+ 
+ #define TCA_ACT_IPT 6
+ 
+-enum
+-{
++enum {
+ 	TCA_IPT_UNSPEC,
+ 	TCA_IPT_TABLE,
+ 	TCA_IPT_HOOK,
+diff --git a/include/linux/tc_act/tc_mirred.h b/include/linux/tc_act/tc_mirred.h
+index 0a99ab6..7561750 100644
+--- a/include/linux/tc_act/tc_mirred.h
++++ b/include/linux/tc_act/tc_mirred.h
+@@ -10,15 +10,13 @@
+ #define TCA_INGRESS_REDIR 3  /* packet redirect to INGRESS*/
+ #define TCA_INGRESS_MIRROR 4 /* mirror packet to INGRESS */
+                                                                                 
+-struct tc_mirred
+-{
++struct tc_mirred {
+ 	tc_gen;
+ 	int                     eaction;   /* one of IN/EGRESS_MIRROR/REDIR */
+ 	__u32                   ifindex;  /* ifindex of egress port */
+ };
+                                                                                 
+-enum
+-{
++enum {
+ 	TCA_MIRRED_UNSPEC,
+ 	TCA_MIRRED_TM,
+ 	TCA_MIRRED_PARMS,
+diff --git a/include/linux/tc_act/tc_nat.h b/include/linux/tc_act/tc_nat.h
+index e7cf31e..6663aeb 100644
+--- a/include/linux/tc_act/tc_nat.h
++++ b/include/linux/tc_act/tc_nat.h
+@@ -6,8 +6,7 @@
+ 
+ #define TCA_ACT_NAT 9
+ 
+-enum
+-{
++enum {
+ 	TCA_NAT_UNSPEC,
+ 	TCA_NAT_PARMS,
+ 	TCA_NAT_TM,
+@@ -17,8 +16,7 @@ enum
+ 
+ #define TCA_NAT_FLAG_EGRESS 1
+ 
+-struct tc_nat
+-{
++struct tc_nat {
+ 	tc_gen;
+ 	__be32 old_addr;
+ 	__be32 new_addr;
+diff --git a/include/linux/tc_act/tc_pedit.h b/include/linux/tc_act/tc_pedit.h
+index 54ce906..716cfab 100644
+--- a/include/linux/tc_act/tc_pedit.h
++++ b/include/linux/tc_act/tc_pedit.h
+@@ -6,8 +6,7 @@
+ 
+ #define TCA_ACT_PEDIT 7
+ 
+-enum
+-{
++enum {
+ 	TCA_PEDIT_UNSPEC,
+ 	TCA_PEDIT_TM,
+ 	TCA_PEDIT_PARMS,
+@@ -15,8 +14,7 @@ enum
+ };
+ #define TCA_PEDIT_MAX (__TCA_PEDIT_MAX - 1)
+                                                                                 
+-struct tc_pedit_key
+-{
++struct tc_pedit_key {
+ 	__u32           mask;  /* AND */
+ 	__u32           val;   /*XOR */
+ 	__u32           off;  /*offset */
+@@ -25,8 +23,7 @@ struct tc_pedit_key
+ 	__u32           shift;
+ };
+                                                                                 
+-struct tc_pedit_sel
+-{
++struct tc_pedit_sel {
+ 	tc_gen;
+ 	unsigned char           nkeys;
+ 	unsigned char           flags;
+diff --git a/include/linux/tc_act/tc_skbedit.h b/include/linux/tc_act/tc_skbedit.h
+index a14e461..7a2e910 100644
+--- a/include/linux/tc_act/tc_skbedit.h
++++ b/include/linux/tc_act/tc_skbedit.h
+@@ -26,6 +26,7 @@
+ 
+ #define SKBEDIT_F_PRIORITY		0x1
+ #define SKBEDIT_F_QUEUE_MAPPING		0x2
++#define SKBEDIT_F_MARK			0x4
+ 
+ struct tc_skbedit {
+ 	tc_gen;
+@@ -37,6 +38,7 @@ enum {
+ 	TCA_SKBEDIT_PARMS,
+ 	TCA_SKBEDIT_PRIORITY,
+ 	TCA_SKBEDIT_QUEUE_MAPPING,
++	TCA_SKBEDIT_MARK,
+ 	__TCA_SKBEDIT_MAX
+ };
+ #define TCA_SKBEDIT_MAX (__TCA_SKBEDIT_MAX - 1)
+diff --git a/include/linux/tc_ematch/tc_em_cmp.h b/include/linux/tc_ematch/tc_em_cmp.h
+index 38e7f7b..f34bb1b 100644
+--- a/include/linux/tc_ematch/tc_em_cmp.h
++++ b/include/linux/tc_ematch/tc_em_cmp.h
+@@ -4,8 +4,7 @@
+ #include <linux/types.h>
+ #include <linux/pkt_cls.h>
+ 
+-struct tcf_em_cmp
+-{
++struct tcf_em_cmp {
+ 	__u32		val;
+ 	__u32		mask;
+ 	__u16		off;
+@@ -15,8 +14,7 @@ struct tcf_em_cmp
+ 	__u8		opnd:4;
+ };
+ 
+-enum
+-{
++enum {
+ 	TCF_EM_ALIGN_U8  = 1,
+ 	TCF_EM_ALIGN_U16 = 2,
+ 	TCF_EM_ALIGN_U32 = 4
+diff --git a/include/linux/tc_ematch/tc_em_meta.h b/include/linux/tc_ematch/tc_em_meta.h
+index dcfb733..0864206 100644
+--- a/include/linux/tc_ematch/tc_em_meta.h
++++ b/include/linux/tc_ematch/tc_em_meta.h
+@@ -4,8 +4,7 @@
+ #include <linux/types.h>
+ #include <linux/pkt_cls.h>
+ 
+-enum
+-{
++enum {
+ 	TCA_EM_META_UNSPEC,
+ 	TCA_EM_META_HDR,
+ 	TCA_EM_META_LVALUE,
+@@ -14,8 +13,7 @@ enum
+ };
+ #define TCA_EM_META_MAX (__TCA_EM_META_MAX - 1)
+ 
+-struct tcf_meta_val
+-{
++struct tcf_meta_val {
+ 	__u16			kind;
+ 	__u8			shift;
+ 	__u8			op;
+@@ -26,16 +24,14 @@ struct tcf_meta_val
+ #define TCF_META_ID_MASK	0x7ff
+ #define TCF_META_ID(kind)	((kind) & TCF_META_ID_MASK)
+ 
+-enum
+-{
++enum {
+ 	TCF_META_TYPE_VAR,
+ 	TCF_META_TYPE_INT,
+ 	__TCF_META_TYPE_MAX
+ };
+ #define TCF_META_TYPE_MAX (__TCF_META_TYPE_MAX - 1)
+ 
+-enum
+-{
++enum {
+ 	TCF_META_ID_VALUE,
+ 	TCF_META_ID_RANDOM,
+ 	TCF_META_ID_LOADAVG_0,
+@@ -87,8 +83,7 @@ enum
+ };
+ #define TCF_META_ID_MAX (__TCF_META_ID_MAX - 1)
+ 
+-struct tcf_meta_hdr
+-{
++struct tcf_meta_hdr {
+ 	struct tcf_meta_val	left;
+ 	struct tcf_meta_val	right;
+ };
+diff --git a/include/linux/tc_ematch/tc_em_nbyte.h b/include/linux/tc_ematch/tc_em_nbyte.h
+index 9ed8c2e..7172cfb 100644
+--- a/include/linux/tc_ematch/tc_em_nbyte.h
++++ b/include/linux/tc_ematch/tc_em_nbyte.h
+@@ -4,8 +4,7 @@
+ #include <linux/types.h>
+ #include <linux/pkt_cls.h>
+ 
+-struct tcf_em_nbyte
+-{
++struct tcf_em_nbyte {
+ 	__u16		off;
+ 	__u16		len:12;
+ 	__u8		layer:4;
+diff --git a/include/linux/xfrm.h b/include/linux/xfrm.h
+index a59bc4a..9686820 100644
+--- a/include/linux/xfrm.h
++++ b/include/linux/xfrm.h
+@@ -10,8 +10,7 @@
+ /* Structure to encapsulate addresses. I do not want to use
+  * "standard" structure. My apologies.
+  */
+-typedef union
+-{
++typedef union {
+ 	__be32		a4;
+ 	__be32		a6[4];
+ } xfrm_address_t;
+@@ -20,8 +19,7 @@ typedef union
+  * the state by (spi,daddr,ah/esp) or to store information about
+  * spi, protocol and tunnel address on output.
+  */
+-struct xfrm_id
+-{
++struct xfrm_id {
+ 	xfrm_address_t	daddr;
+ 	__be32		spi;
+ 	__u8		proto;
+@@ -45,8 +43,7 @@ struct xfrm_sec_ctx {
+ 
+ /* Selector, used as selector both on policy rules (SPD) and SAs. */
+ 
+-struct xfrm_selector
+-{
++struct xfrm_selector {
+ 	xfrm_address_t	daddr;
+ 	xfrm_address_t	saddr;
+ 	__be16	dport;
+@@ -63,8 +60,7 @@ struct xfrm_selector
+ 
+ #define XFRM_INF (~(__u64)0)
+ 
+-struct xfrm_lifetime_cfg
+-{
++struct xfrm_lifetime_cfg {
+ 	__u64	soft_byte_limit;
+ 	__u64	hard_byte_limit;
+ 	__u64	soft_packet_limit;
+@@ -75,16 +71,14 @@ struct xfrm_lifetime_cfg
+ 	__u64	hard_use_expires_seconds;
+ };
+ 
+-struct xfrm_lifetime_cur
+-{
++struct xfrm_lifetime_cur {
+ 	__u64	bytes;
+ 	__u64	packets;
+ 	__u64	add_time;
+ 	__u64	use_time;
+ };
+ 
+-struct xfrm_replay_state
+-{
++struct xfrm_replay_state {
+ 	__u32	oseq;
+ 	__u32	seq;
+ 	__u32	bitmap;
+@@ -96,6 +90,13 @@ struct xfrm_algo {
+ 	char		alg_key[0];
+ };
+ 
++struct xfrm_algo_auth {
++	char		alg_name[64];
++	unsigned int	alg_key_len;    /* in bits */
++	unsigned int	alg_trunc_len;  /* in bits */
++	char		alg_key[0];
++};
++
+ struct xfrm_algo_aead {
+ 	char		alg_name[64];
+ 	unsigned int	alg_key_len;	/* in bits */
+@@ -109,16 +110,14 @@ struct xfrm_stats {
+ 	__u32	integrity_failed;
+ };
+ 
+-enum
+-{
++enum {
+ 	XFRM_POLICY_TYPE_MAIN	= 0,
+ 	XFRM_POLICY_TYPE_SUB	= 1,
+ 	XFRM_POLICY_TYPE_MAX	= 2,
+ 	XFRM_POLICY_TYPE_ANY	= 255
+ };
+ 
+-enum
+-{
++enum {
+ 	XFRM_POLICY_IN	= 0,
+ 	XFRM_POLICY_OUT	= 1,
+ 	XFRM_POLICY_FWD	= 2,
+@@ -126,8 +125,7 @@ enum
+ 	XFRM_POLICY_MAX	= 3
+ };
+ 
+-enum
+-{
++enum {
+ 	XFRM_SHARE_ANY,		/* No limitations */
+ 	XFRM_SHARE_SESSION,	/* For this session only */
+ 	XFRM_SHARE_USER,	/* For this user only */
+@@ -283,6 +281,7 @@ enum xfrm_attr_type_t {
+ 	XFRMA_MIGRATE,
+ 	XFRMA_ALG_AEAD,		/* struct xfrm_algo_aead */
+ 	XFRMA_KMADDRESS,        /* struct xfrm_user_kmaddress */
++	XFRMA_ALG_AUTH_TRUNC,	/* struct xfrm_algo_auth */
+ 	__XFRMA_MAX
+ 
+ #define XFRMA_MAX (__XFRMA_MAX - 1)
+-- 
+1.6.6
+

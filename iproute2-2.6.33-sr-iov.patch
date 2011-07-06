@@ -1,0 +1,470 @@
+diff --git a/include/linux/can/netlink.h b/include/linux/can/netlink.h
+index 9ecbb78..3250de9 100644
+--- a/include/linux/can/netlink.h
++++ b/include/linux/can/netlink.h
+@@ -70,6 +70,14 @@ enum can_state {
+ };
+ 
+ /*
++ * CAN bus error counters
++ */
++struct can_berr_counter {
++	__u16 txerr;
++	__u16 rxerr;
++};
++
++/*
+  * CAN controller mode
+  */
+ struct can_ctrlmode {
+@@ -77,9 +85,11 @@ struct can_ctrlmode {
+ 	__u32 flags;
+ };
+ 
+-#define CAN_CTRLMODE_LOOPBACK	0x1	/* Loopback mode */
+-#define CAN_CTRLMODE_LISTENONLY	0x2 	/* Listen-only mode */
+-#define CAN_CTRLMODE_3_SAMPLES	0x4	/* Triple sampling mode */
++#define CAN_CTRLMODE_LOOPBACK		0x01	/* Loopback mode */
++#define CAN_CTRLMODE_LISTENONLY		0x02 	/* Listen-only mode */
++#define CAN_CTRLMODE_3_SAMPLES		0x04	/* Triple sampling mode */
++#define CAN_CTRLMODE_ONE_SHOT		0x08	/* One-Shot mode */
++#define CAN_CTRLMODE_BERR_REPORTING	0x10	/* Bus-error reporting */
+ 
+ /*
+  * CAN device statistics
+@@ -105,6 +115,7 @@ enum {
+ 	IFLA_CAN_CTRLMODE,
+ 	IFLA_CAN_RESTART_MS,
+ 	IFLA_CAN_RESTART,
++	IFLA_CAN_BERR_COUNTER,
+ 	__IFLA_CAN_MAX
+ };
+ 
+diff --git a/include/linux/if_link.h b/include/linux/if_link.h
+index cbefb3b..591b09c 100644
+--- a/include/linux/if_link.h
++++ b/include/linux/if_link.h
+@@ -78,6 +78,8 @@ enum {
+ #define IFLA_LINKINFO IFLA_LINKINFO
+ 	IFLA_NET_NS_PID,
+ 	IFLA_IFALIAS,
++	IFLA_NUM_VF,		/* Number of VFs if device is SR-IOV PF */
++	IFLA_VFINFO_LIST,
+ 	__IFLA_MAX
+ };
+ 
+@@ -194,4 +196,47 @@ enum macvlan_mode {
+ 	MACVLAN_MODE_BRIDGE  = 4, /* talk to bridge ports directly */
+ };
+ 
++/* SR-IOV virtual function managment section */
++
++enum {
++	IFLA_VF_INFO_UNSPEC,
++	IFLA_VF_INFO,
++	__IFLA_VF_INFO_MAX,
++};
++
++#define IFLA_VF_INFO_MAX (__IFLA_VF_INFO_MAX - 1)
++
++enum {
++	IFLA_VF_UNSPEC,
++	IFLA_VF_MAC,		/* Hardware queue specific attributes */
++	IFLA_VF_VLAN,
++	IFLA_VF_TX_RATE,	/* TX Bandwidth Allocation */
++	__IFLA_VF_MAX,
++};
++
++#define IFLA_VF_MAX (__IFLA_VF_MAX - 1)
++
++struct ifla_vf_mac {
++	__u32 vf;
++	__u8 mac[32]; /* MAX_ADDR_LEN */
++};
++
++struct ifla_vf_vlan {
++	__u32 vf;
++	__u32 vlan; /* 0 - 4095, 0 disables VLAN filter */
++	__u32 qos;
++};
++
++struct ifla_vf_tx_rate {
++	__u32 vf;
++	__u32 rate; /* Max TX bandwidth in Mbps, 0 disables throttling */
++};
++
++struct ifla_vf_info {
++	__u32 vf;
++	__u8 mac[32];
++	__u32 vlan;
++	__u32 qos;
++	__u32 tx_rate;
++};
+ #endif /* _LINUX_IF_LINK_H */
+diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
+index 9035dfa..3dbf0cc 100644
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -28,6 +28,7 @@
+ #include <linux/if.h>
+ #include <linux/if_ether.h>
+ #include <linux/if_packet.h>
++#include <linux/if_link.h>
+ 
+ 
+ #define MAX_ADDR_LEN	32		/* Largest hardware address length */
+diff --git a/include/linux/netfilter/x_tables.h b/include/linux/netfilter/x_tables.h
+index ccb5641..1616f4f 100644
+--- a/include/linux/netfilter/x_tables.h
++++ b/include/linux/netfilter/x_tables.h
+@@ -93,8 +93,7 @@ struct _xt_align {
+ 	__u64 u64;
+ };
+ 
+-#define XT_ALIGN(s) (((s) + (__alignof__(struct _xt_align)-1)) 	\
+-			& ~(__alignof__(struct _xt_align)-1))
++#define XT_ALIGN(s) ALIGN((s), __alignof__(struct _xt_align))
+ 
+ /* Standard return verdict, or do jump. */
+ #define XT_STANDARD_TARGET ""
+@@ -165,4 +164,19 @@ struct xt_counters_info {
+ 	XT_ENTRY_ITERATE_CONTINUE(type, entries, size, 0, fn, args)
+ 
+ 
++/* pos is normally a struct ipt_entry/ip6t_entry/etc. */
++#define xt_entry_foreach(pos, ehead, esize) \
++	for ((pos) = (typeof(pos))(ehead); \
++	     (pos) < (typeof(pos))((char *)(ehead) + (esize)); \
++	     (pos) = (typeof(pos))((char *)(pos) + (pos)->next_offset))
++
++/* can only be xt_entry_match, so no use of typeof here */
++#define xt_ematch_foreach(pos, entry) \
++	for ((pos) = (struct xt_entry_match *)entry->elems; \
++	     (pos) < (struct xt_entry_match *)((char *)(entry) + \
++	             (entry)->target_offset); \
++	     (pos) = (struct xt_entry_match *)((char *)(pos) + \
++	             (pos)->u.match_size))
++
++
+ #endif /* _X_TABLES_H */
+diff --git a/include/linux/rtnetlink.h b/include/linux/rtnetlink.h
+index 5b46173..e94981d 100644
+--- a/include/linux/rtnetlink.h
++++ b/include/linux/rtnetlink.h
+@@ -362,6 +362,8 @@ enum {
+ #define RTAX_FEATURES RTAX_FEATURES
+ 	RTAX_RTO_MIN,
+ #define RTAX_RTO_MIN RTAX_RTO_MIN
++	RTAX_INITRWND,
++#define RTAX_INITRWND RTAX_INITRWND
+ 	__RTAX_MAX
+ };
+ 
+diff --git a/include/linux/xfrm.h b/include/linux/xfrm.h
+index 9686820..07f2b63 100644
+--- a/include/linux/xfrm.h
++++ b/include/linux/xfrm.h
+@@ -267,8 +267,8 @@ enum xfrm_attr_type_t {
+ 	XFRMA_ALG_COMP,		/* struct xfrm_algo */
+ 	XFRMA_ENCAP,		/* struct xfrm_algo + struct xfrm_encap_tmpl */
+ 	XFRMA_TMPL,		/* 1 or more struct xfrm_user_tmpl */
+-	XFRMA_SA,
+-	XFRMA_POLICY,
++	XFRMA_SA,		/* struct xfrm_usersa_info  */
++	XFRMA_POLICY,		/*struct xfrm_userpolicy_info */
+ 	XFRMA_SEC_CTX,		/* struct xfrm_sec_ctx */
+ 	XFRMA_LTIME_VAL,
+ 	XFRMA_REPLAY_VAL,
+@@ -276,17 +276,23 @@ enum xfrm_attr_type_t {
+ 	XFRMA_ETIMER_THRESH,
+ 	XFRMA_SRCADDR,		/* xfrm_address_t */
+ 	XFRMA_COADDR,		/* xfrm_address_t */
+-	XFRMA_LASTUSED,
++	XFRMA_LASTUSED,		/* unsigned long  */
+ 	XFRMA_POLICY_TYPE,	/* struct xfrm_userpolicy_type */
+ 	XFRMA_MIGRATE,
+ 	XFRMA_ALG_AEAD,		/* struct xfrm_algo_aead */
+ 	XFRMA_KMADDRESS,        /* struct xfrm_user_kmaddress */
+ 	XFRMA_ALG_AUTH_TRUNC,	/* struct xfrm_algo_auth */
++	XFRMA_MARK,		/* struct xfrm_mark */
+ 	__XFRMA_MAX
+ 
+ #define XFRMA_MAX (__XFRMA_MAX - 1)
+ };
+ 
++struct xfrm_mark {
++	__u32           v; /* value */
++	__u32           m; /* mask */
++};
++
+ enum xfrm_sadattr_type_t {
+ 	XFRMA_SAD_UNSPEC,
+ 	XFRMA_SAD_CNT,
+diff --git a/ip/ipaddress.c b/ip/ipaddress.c
+index c638ca7..8ad17d3 100644
+--- a/ip/ipaddress.c
++++ b/ip/ipaddress.c
+@@ -186,6 +186,36 @@ static void print_linktype(FILE *fp, struct rtattr *tb)
+ 	}
+ }
+ 
++static void print_vfinfo(FILE *fp, struct rtattr *vfinfo)
++{
++	struct ifla_vf_mac *vf_mac;
++	struct ifla_vf_vlan *vf_vlan;
++	struct ifla_vf_tx_rate *vf_tx_rate;
++	struct rtattr *vf[IFLA_VF_MAX+1];
++	SPRINT_BUF(b1);
++
++	if (vfinfo->rta_type != IFLA_VF_INFO) {
++		fprintf(stderr, "BUG: rta type is %d\n", vfinfo->rta_type);
++		return;
++	}
++
++	parse_rtattr_nested(vf, IFLA_VF_MAX, vfinfo);
++
++	vf_mac = RTA_DATA(vf[IFLA_VF_MAC]);
++	vf_vlan = RTA_DATA(vf[IFLA_VF_VLAN]);
++	vf_tx_rate = RTA_DATA(vf[IFLA_VF_TX_RATE]);
++
++	fprintf(fp, "\n    vf %d MAC %s", vf_mac->vf,
++		ll_addr_n2a((unsigned char *)&vf_mac->mac,
++		ETH_ALEN, 0, b1, sizeof(b1)));
++	if (vf_vlan->vlan)
++		fprintf(fp, ", vlan %d", vf_vlan->vlan);
++	if (vf_vlan->qos)
++		fprintf(fp, ", qos %d", vf_vlan->qos);
++	if (vf_tx_rate->rate)
++		fprintf(fp, ", tx rate %d (Mbps)", vf_tx_rate->rate);
++}
++
+ int print_linkinfo(const struct sockaddr_nl *who,
+ 		   struct nlmsghdr *n, void *arg)
+ {
+@@ -330,6 +360,13 @@ int print_linkinfo(const struct sockaddr_nl *who,
+ 				);
+ 		}
+ 	}
++	if (do_link && tb[IFLA_VFINFO_LIST] && tb[IFLA_NUM_VF]) {
++		struct rtattr *i, *vflist = tb[IFLA_VFINFO_LIST];
++		int rem = RTA_PAYLOAD(vflist);
++		for (i = RTA_DATA(vflist); RTA_OK(i, rem); i = RTA_NEXT(i, rem))
++			print_vfinfo(fp, i);
++	}
++
+ 	fprintf(fp, "\n");
+ 	fflush(fp);
+ 	return 0;
+diff --git a/ip/iplink.c b/ip/iplink.c
+index 32cce24..cb2c4f5 100644
+--- a/ip/iplink.c
++++ b/ip/iplink.c
+@@ -68,6 +68,9 @@ void iplink_usage(void)
+ 	fprintf(stderr, "	                  [ mtu MTU ]\n");
+ 	fprintf(stderr, "	                  [ netns PID ]\n");
+ 	fprintf(stderr, "			  [ alias NAME ]\n");
++	fprintf(stderr, "	                  [ vf NUM [ mac LLADDR ]\n");
++	fprintf(stderr, "				   [ vlan VLANID [ qos VLAN-QOS ] ]\n");
++	fprintf(stderr, "				   [ rate TXRATE ] ] \n");
+ 	fprintf(stderr, "       ip link show [ DEVICE ]\n");
+ 
+ 	if (iplink_have_newlink()) {
+@@ -173,6 +176,73 @@ struct iplink_req {
+ 	char			buf[1024];
+ };
+ 
++int iplink_parse_vf(int vf, int *argcp, char ***argvp,
++			   struct iplink_req *req)
++{
++	int len, argc = *argcp;
++	char **argv = *argvp;
++	struct rtattr *vfinfo;
++
++	vfinfo = addattr_nest(&req->n, sizeof(*req), IFLA_VF_INFO);
++
++	while (NEXT_ARG_OK()) {
++		NEXT_ARG();
++		if (matches(*argv, "mac") == 0) {
++			struct ifla_vf_mac ivm;
++			NEXT_ARG();
++			ivm.vf = vf;
++			len = ll_addr_a2n((char *)ivm.mac, 32, *argv);
++			if (len < 0)
++				return -1;
++			addattr_l(&req->n, sizeof(*req), IFLA_VF_MAC, &ivm, sizeof(ivm));
++		} else if (matches(*argv, "vlan") == 0) {
++			struct ifla_vf_vlan ivv;
++			NEXT_ARG();
++			if (get_unsigned(&ivv.vlan, *argv, 0)) {
++				invarg("Invalid \"vlan\" value\n", *argv);
++			}
++			ivv.vf = vf;
++			ivv.qos = 0;
++			if (NEXT_ARG_OK()) {
++				NEXT_ARG();
++				if (matches(*argv, "qos") == 0) {
++					NEXT_ARG();
++					if (get_unsigned(&ivv.qos, *argv, 0)) {
++						invarg("Invalid \"qos\" value\n", *argv);
++					}
++				} else {
++					/* rewind arg */
++					PREV_ARG();
++				}
++			}
++			addattr_l(&req->n, sizeof(*req), IFLA_VF_VLAN, &ivv, sizeof(ivv));
++		} else if (matches(*argv, "rate") == 0) {
++			struct ifla_vf_tx_rate ivt;
++			NEXT_ARG();
++			if (get_unsigned(&ivt.rate, *argv, 0)) {
++				invarg("Invalid \"rate\" value\n", *argv);
++			}
++			ivt.vf = vf;
++			addattr_l(&req->n, sizeof(*req), IFLA_VF_TX_RATE, &ivt, sizeof(ivt));
++		
++		} else {
++			/* rewind arg */
++			PREV_ARG();
++			break;
++		}
++	}
++
++	if (argc == *argcp)
++		incomplete_command();
++
++	addattr_nest_end(&req->n, vfinfo);
++
++	*argcp = argc;
++	*argvp = argv;
++	return 0;
++}
++
++
+ int iplink_parse(int argc, char **argv, struct iplink_req *req,
+ 		char **name, char **type, char **link, char **dev)
+ {
+@@ -181,6 +251,7 @@ int iplink_parse(int argc, char **argv, struct iplink_req *req,
+ 	int qlen = -1;
+ 	int mtu = -1;
+ 	int netns = -1;
++	int vf = -1;
+ 
+ 	ret = argc;
+ 
+@@ -278,6 +349,18 @@ int iplink_parse(int argc, char **argv, struct iplink_req *req,
+ 				req->i.ifi_flags |= IFF_NOARP;
+ 			} else
+ 				return on_off("noarp");
++		} else if (strcmp(*argv, "vf") == 0) {
++			struct rtattr *vflist;
++			NEXT_ARG();
++			if (get_integer(&vf,  *argv, 0)) {
++				invarg("Invalid \"vf\" value\n", *argv);
++			}
++			vflist = addattr_nest(&req->n, sizeof(*req),
++					      IFLA_VFINFO_LIST);
++			len = iplink_parse_vf(vf, &argc, &argv, req);
++			if (len < 0)
++				return -1;
++			addattr_nest_end(&req->n, vflist);
+ #ifdef IFF_DYNAMIC
+ 		} else if (matches(*argv, "dynamic") == 0) {
+ 			NEXT_ARG();
+diff --git a/man/man8/ip.8 b/man/man8/ip.8
+index 6c02b0c..cc4eac6 100644
+--- a/man/man8/ip.8
++++ b/man/man8/ip.8
+@@ -53,7 +53,23 @@ ip \- show / manipulate routing, devices, policy routing and tunnels
+ .IR MTU " |"
+ .br
+ .B  netns
+-.IR PID " }"
++.IR PID " |"
++.br
++.B alias
++.IR NAME  " |"
++.br
++.B vf
++.IR NUM " ["
++.B  mac
++.IR LLADDR " ] ["
++.B vlan
++.IR VLANID " [ "
++.B qos
++.IR VLAN-QOS " ] ] ["
++.B rate
++.IR TXRATE " ]"
++.BR " }"
++
+ 
+ .ti -8
+ .B ip link show
+@@ -826,7 +842,9 @@ display and change the state of devices.
+ .TP
+ .BI dev " NAME " (default)
+ .I NAME
+-specifies network device to operate on.
++specifies network device to operate on. When configuring SR-IOV Virtual Fuction
++(VF) devices, this keyword should specify the associated Physical Function (PF)
++device.
+ 
+ .TP
+ .BR up " and " down
+@@ -888,7 +906,56 @@ the interface is
+ .TP
+ .BI netns " PID"
+ move the device to the network namespace associated with the process
+-.IR "PID" .
++.IR "PID".
++
++.TP
++.BI alias " NAME"
++give the device a symbolic name for easy reference.
++
++.TP
++.BI vf " NUM"
++specify a Virtual Function device to be configured. The associated PF device
++must be specified using the
++.B dev
++parameter.
++
++.in +8
++.BI mac " LLADDRESS"
++- change the station address for the specified VF. The
++.B vf
++parameter must be specified.
++
++.sp
++.BI vlan " VLANID"
++- change the assigned VLAN for the specified VF. When specified, all traffic
++sent from the VF will be tagged with the specified VLAN ID. Incoming traffic
++will be filtered for the specified VLAN ID, and will have all VLAN tags
++stripped before being passed to the VF. Setting this parameter to 0 disables
++VLAN tagging and filtering. The
++.B vf
++parameter must be specified.
++
++.sp
++.BI qos " VLAN-QOS"
++- assign VLAN QOS (priority) bits for the VLAN tag. When specified, all VLAN
++tags transmitted by the VF will include the specified priority bits in the
++VLAN tag. If not specified, the value is assumed to be 0. Both the
++.B vf
++and
++.B vlan
++parameters must be specified. Setting both
++.B vlan
++and
++.B qos
++as 0 disables VLAN tagging and filtering for the VF.
++
++.sp
++.BI rate " TXRATE"
++- change the allowed transmit bandwidth, in Mbps, for the specified VF.
++Setting this parameter to 0 disables rate limiting. The
++.B vf
++parameter must be specified.
++.in -8
+ 
+ .PP
+ .B Warning:
